@@ -34,6 +34,7 @@
 #define    kInAppBrowserToolbarBarPositionTop @"top"
 
 #define    IAB_BRIDGE_NAME @"cordova_iab"
+#define    SPA_ROUTE_CHANGE_EVENT @"spa_route_change_event"
 
 #define    TOOLBAR_HEIGHT 44.0
 #define    STATUSBAR_HEIGHT 20.0
@@ -217,7 +218,7 @@ static CDVWKInAppBrowser* instance = nil;
         if(appendUserAgent){
             userAgent = [userAgent stringByAppendingString: appendUserAgent];
         }
-        self.inAppBrowserViewController = [[CDVWKInAppBrowserViewController alloc] initWithUserAgent:userAgent prevUserAgent:[self.commandDelegate userAgent] browserOptions: browserOptions];
+        self.inAppBrowserViewController = [[CDVWKInAppBrowserViewController alloc] initWithUserAgent:userAgent prevUserAgent:[self.commandDelegate userAgent] browserOptions: browserOptions originURL: url];
         self.inAppBrowserViewController.navigationDelegate = self;
         
         if ([self.viewController conformsToProtocol:@protocol(CDVScreenOrientationDelegate)]) {
@@ -712,9 +713,11 @@ static CDVWKInAppBrowser* instance = nil;
 BOOL viewRenderedAtLeastOnce = FALSE;
 BOOL isExiting = FALSE;
 
-- (id)initWithUserAgent:(NSString*)userAgent prevUserAgent:(NSString*)prevUserAgent browserOptions: (CDVInAppBrowserOptions*) browserOptions
+- (id)initWithUserAgent:(NSString*)userAgent prevUserAgent:(NSString*)prevUserAgent browserOptions: (CDVInAppBrowserOptions*) browserOptions originURL:(NSURL*) originURL
 {
     self = [super init];
+    
+    self.originURL = originURL;
     
     // Get safe area insets
     if (@available(iOS 11.0, *)) {
@@ -745,8 +748,6 @@ BOOL isExiting = FALSE;
     // We create the views in code for primarily for ease of upgrades and not requiring an external .xib to be included
     
     CGRect viewBounds = self.view.bounds;
-    // Deprecated, we have both header and footer now
-    BOOL toolbarIsAtBottom = ![_browserOptions.toolbarposition isEqualToString:kInAppBrowserToolbarBarPositionTop];
     CGFloat headerHeight = TOOLBAR_HEIGHT + self.SAFE_AREA_INSET_TOP;
     CGFloat footerHeight = TOOLBAR_HEIGHT + self.SAFE_AREA_INSET_BOTTOM;
     
@@ -756,7 +757,12 @@ BOOL isExiting = FALSE;
 #if __has_include("CDVWKProcessPoolFactory.h")
     configuration.processPool = [[CDVWKProcessPoolFactory sharedFactory] sharedProcessPool];
 #endif
+    
+    WKUserScript *script = [[WKUserScript alloc] initWithSource:@"document.addEventListener('click', function(){ window.webkit.messageHandlers.spa_route_change_event.postMessage('click');})" injectionTime: WKUserScriptInjectionTimeAtDocumentEnd forMainFrameOnly:NO];
+    [configuration.userContentController addUserScript:script];
+    
     [configuration.userContentController addScriptMessageHandler:self name:IAB_BRIDGE_NAME];
+    [configuration.userContentController addScriptMessageHandler:self name:SPA_ROUTE_CHANGE_EVENT];
     
     //WKWebView options
     configuration.allowsInlineMediaPlayback = _browserOptions.allowinlinemediaplayback;
@@ -777,7 +783,6 @@ BOOL isExiting = FALSE;
     
     [self.view addSubview:self.webView];
     [self.view sendSubviewToBack:self.webView];
-    
     
     self.webView.navigationDelegate = self;
     self.webView.UIDelegate = self.webViewUIDelegate;
@@ -827,7 +832,7 @@ BOOL isExiting = FALSE;
     self.toolbar = [[UIToolbar alloc] initWithFrame:toolbarFrame];
     self.toolbar.alpha = 1.000;
     self.toolbar.autoresizesSubviews = YES;
-    self.toolbar.autoresizingMask = toolbarIsAtBottom ? (UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleTopMargin) : UIViewAutoresizingFlexibleWidth;
+    self.toolbar.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleTopMargin;
     self.toolbar.barStyle = UIBarStyleBlackOpaque;
     self.toolbar.clearsContextBeforeDrawing = NO;
     self.toolbar.clipsToBounds = NO;
@@ -845,8 +850,6 @@ BOOL isExiting = FALSE;
     }
     
     // Header
-    UIBarButtonItem *headerTitle = [[UIBarButtonItem alloc] initWithTitle:_browserOptions.title style:UIBarButtonItemStylePlain target:nil action:nil];
-    [headerTitle setTintColor:[UIColor blackColor]];
     UIToolbar* header = [[UIToolbar alloc] initWithFrame:CGRectMake(0, 0, viewBounds.size.width, headerHeight)];
     header.backgroundColor = [UIColor whiteColor];
     header.translucent = NO;
@@ -855,6 +858,13 @@ BOOL isExiting = FALSE;
     [buttomBorder setAutoresizingMask:UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleBottomMargin];
     buttomBorder.frame = CGRectMake(0, header.bounds.size.height-0.5, header.bounds.size.width, 0.5);
     [header addSubview: buttomBorder];
+    UIBarButtonItem *headerTitle = [[UIBarButtonItem alloc] initWithTitle:_browserOptions.title style:UIBarButtonItemStylePlain target:nil action:nil];
+    [headerTitle setTintColor:[UIColor blackColor]];
+    UIFont *headerTitleIconFont = [UIFont systemFontOfSize: 18 weight: UIFontWeightMedium];
+    NSDictionary *headerTitleAttributes = @{NSFontAttributeName: headerTitleIconFont};
+    [headerTitle setTitleTextAttributes:headerTitleAttributes forState:UIControlStateNormal];
+    [headerTitle setTitleTextAttributes:headerTitleAttributes forState:UIControlStateSelected];
+    [headerTitle setTitleTextAttributes:headerTitleAttributes forState:UIControlStateDisabled];
     [header setItems:@[self.closeButton, flexibleSpaceButton, headerTitle, flexibleSpaceButton]];
     
     // Footer
@@ -868,7 +878,7 @@ BOOL isExiting = FALSE;
     [footer addSubview: topBorder];
     
     CGFloat labelInset = 5.0;
-    float locationBarY = toolbarIsAtBottom ? self.view.bounds.size.height - FOOTER_HEIGHT : self.view.bounds.size.height - LOCATIONBAR_HEIGHT;
+    float locationBarY = self.view.bounds.size.height - FOOTER_HEIGHT;
     
     self.addressLabel = [[UILabel alloc] initWithFrame:CGRectMake(labelInset, locationBarY, self.view.bounds.size.width - labelInset, LOCATIONBAR_HEIGHT)];
     self.addressLabel.adjustsFontSizeToFitWidth = NO;
@@ -900,11 +910,12 @@ BOOL isExiting = FALSE;
     self.addressLabel.userInteractionEnabled = NO;
     self.addressLabel.hidden = YES;
     
-    UIFont *toolbarIconFont = [UIFont systemFontOfSize: 32 weight: UIFontWeightLight];
+    UIFont *toolbarIconFont = [UIFont systemFontOfSize: 30 weight: UIFontWeightLight];
     NSDictionary *toolbarAttributes = @{NSFontAttributeName: toolbarIconFont};
     NSString* frontArrowString = NSLocalizedString(@"→", nil); // create arrow from Unicode char
     self.forwardButton = [[UIBarButtonItem alloc] initWithTitle:frontArrowString style:UIBarButtonItemStylePlain target:self action:@selector(goForward:)];
     [self.forwardButton setTitleTextAttributes:toolbarAttributes forState: UIControlStateNormal];
+    [self.forwardButton setTitleTextAttributes:toolbarAttributes forState: UIControlStateHighlighted];
     [self.forwardButton setTitleTextAttributes:toolbarAttributes forState: UIControlStateDisabled];
     self.forwardButton.enabled = YES;
     self.forwardButton.imageInsets = UIEdgeInsetsZero;
@@ -920,9 +931,11 @@ BOOL isExiting = FALSE;
       self.backButton.tintColor = [self colorFromHexString:_browserOptions.navigationbuttoncolor];
     }
     [self.backButton setTitleTextAttributes:toolbarAttributes forState: UIControlStateNormal];
+    [self.backButton setTitleTextAttributes:toolbarAttributes forState: UIControlStateHighlighted];
     [self.backButton setTitleTextAttributes:toolbarAttributes forState: UIControlStateDisabled];
+    UIBarButtonItem *browserButton = [[UIBarButtonItem alloc] initWithTitle:@"Browser" style:UIBarButtonItemStylePlain target:self action:@selector(reopenInBrowser:)];
 
-    [self.toolbar setItems:@[flexibleSpaceButton, self.backButton, fixedSpaceButton, self.forwardButton]];
+    [self.toolbar setItems:@[self.backButton, fixedSpaceButton, self.forwardButton, flexibleSpaceButton, browserButton]];
     
     [self.view addSubview:header];
     [self.view addSubview:footer];
@@ -1124,11 +1137,18 @@ BOOL isExiting = FALSE;
 - (void)goBack:(id)sender
 {
     [self.webView goBack];
+    [self performSelector:@selector(updateNavigateButtons) withObject:nil afterDelay:0.3];
 }
 
 - (void)goForward:(id)sender
 {
     [self.webView goForward];
+    [self performSelector:@selector(updateNavigateButtons) withObject:nil afterDelay:0.3];
+}
+
+- (void)reopenInBrowser:(id)sender
+{
+    [[UIApplication sharedApplication] openURL:self.originURL];
 }
 
 - (void)viewWillAppear:(BOOL)animated
@@ -1264,11 +1284,22 @@ BOOL isExiting = FALSE;
 
 #pragma mark WKScriptMessageHandler delegate
 - (void)userContentController:(nonnull WKUserContentController *)userContentController didReceiveScriptMessage:(nonnull WKScriptMessage *)message {
+    if([message.name isEqualToString:SPA_ROUTE_CHANGE_EVENT]) {
+        [self updateNavigateButtons];
+    }
+    
     if (![message.name isEqualToString:IAB_BRIDGE_NAME]) {
         return;
     }
     //NSLog(@"Received script message %@", message.body);
     [self.navigationDelegate userContentController:userContentController didReceiveScriptMessage:message];
+}
+
+- (void)updateNavigateButtons
+{
+    NSLog(@"updateNavigateButtons");
+    self.backButton.enabled = self.webView.canGoBack;
+    self.forwardButton.enabled = self.webView.canGoForward;
 }
 
 #pragma mark CDVScreenOrientationDelegate
@@ -1298,6 +1329,5 @@ BOOL isExiting = FALSE;
     
     return YES;
 }
-
 
 @end //CDVWKInAppBrowserViewController
