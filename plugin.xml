@@ -88,12 +88,12 @@
             </feature>
         </config-file>
 
-        <header-file src="src/ios/CDVInAppBrowser.h" />
+      <header-file src="src/ios/CDVInAppBrowser.h" />
 	    <source-file src="src/ios/CDVInAppBrowser.m" />
-        <header-file src="src/ios/CDVInAppBrowserOptions.h" />
-        <source-file src="src/ios/CDVInAppBrowserOptions.m" />
-        <header-file src="src/ios/CDVInAppBrowserNavigationController.h" />
-        <source-file src="src/ios/CDVInAppBrowserNavigationController.m" />
+      <header-file src="src/ios/CDVInAppBrowserOptions.h" />
+      <source-file src="src/ios/CDVInAppBrowserOptions.m" />
+      <header-file src="src/ios/CDVInAppBrowserNavigationController.h" />
+      <source-file src="src/ios/CDVInAppBrowserNavigationController.m" />
 	    <header-file src="src/ios/CDVUIInAppBrowser.h" />
 	    <source-file src="src/ios/CDVUIInAppBrowser.m" />
 	    <header-file src="src/ios/CDVWKInAppBrowser.h" />
@@ -101,6 +101,7 @@
 	    <header-file src="src/ios/CDVWKInAppBrowserUIDelegate.h" />
 	    <source-file src="src/ios/CDVWKInAppBrowserUIDelegate.m" />
 
+      <resource-file src="src/ios/images/icons-back.png" />
 
 	    <framework src="CoreGraphics.framework" />
     </platform>
