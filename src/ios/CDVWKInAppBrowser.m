@@ -820,13 +820,13 @@ BOOL isExiting = FALSE;
     self.spinner.userInteractionEnabled = NO;
     [self.spinner stopAnimating];
     
-    self.closeButton = [[UIBarButtonItem alloc] initWithBarButtonSystemItem:UIBarButtonSystemItemDone target:self action:@selector(close)];
-    self.closeButton.enabled = YES;
+    self.closeButton = [[UIBarButtonItem alloc] initWithImage:[UIImage imageNamed:@"CDVInAppBrowser.bundle/back"] style:UIBarButtonItemStylePlain target:self action:@selector(close)];
+    self.closeButton.imageInsets = UIEdgeInsetsMake(20.0, 0.0, 0.0, 0.0);
     
     UIBarButtonItem* flexibleSpaceButton = [[UIBarButtonItem alloc] initWithBarButtonSystemItem:UIBarButtonSystemItemFlexibleSpace target:nil action:nil];
     
     UIBarButtonItem* fixedSpaceButton = [[UIBarButtonItem alloc] initWithBarButtonSystemItem:UIBarButtonSystemItemFixedSpace target:nil action:nil];
-    fixedSpaceButton.width = 20;
+    fixedSpaceButton.width = 32;
     
     CGRect toolbarFrame = CGRectMake(0, 0, viewBounds.size.width, TOOLBAR_HEIGHT);
     self.toolbar = [[UIToolbar alloc] initWithFrame:toolbarFrame];
@@ -910,32 +910,17 @@ BOOL isExiting = FALSE;
     self.addressLabel.userInteractionEnabled = NO;
     self.addressLabel.hidden = YES;
     
-    UIFont *toolbarIconFont = [UIFont systemFontOfSize: 30 weight: UIFontWeightLight];
-    NSDictionary *toolbarAttributes = @{NSFontAttributeName: toolbarIconFont};
-    NSString* frontArrowString = NSLocalizedString(@"→", nil); // create arrow from Unicode char
-    self.forwardButton = [[UIBarButtonItem alloc] initWithTitle:frontArrowString style:UIBarButtonItemStylePlain target:self action:@selector(goForward:)];
-    [self.forwardButton setTitleTextAttributes:toolbarAttributes forState: UIControlStateNormal];
-    [self.forwardButton setTitleTextAttributes:toolbarAttributes forState: UIControlStateHighlighted];
-    [self.forwardButton setTitleTextAttributes:toolbarAttributes forState: UIControlStateDisabled];
+    self.forwardButton = [[UIBarButtonItem alloc] initWithImage:[UIImage imageNamed:@"CDVInAppBrowser.bundle/forward"] style:UIBarButtonItemStylePlain target:self action:@selector(goForward:)];
     self.forwardButton.enabled = YES;
     self.forwardButton.imageInsets = UIEdgeInsetsZero;
-    if (_browserOptions.navigationbuttoncolor != nil) { // Set button color if user sets it in options
-      self.forwardButton.tintColor = [self colorFromHexString:_browserOptions.navigationbuttoncolor];
-    }
 
-    NSString* backArrowString = NSLocalizedString(@"←", nil); // create arrow from Unicode char
-    self.backButton = [[UIBarButtonItem alloc] initWithTitle:backArrowString style:UIBarButtonItemStylePlain target:self action:@selector(goBack:)];
+    self.backButton = [[UIBarButtonItem alloc] initWithImage:[UIImage imageNamed:@"CDVInAppBrowser.bundle/backward"] style:UIBarButtonItemStylePlain target:self action:@selector(goBack:)];
     self.backButton.enabled = YES;
     self.backButton.imageInsets = UIEdgeInsetsZero;
-    if (_browserOptions.navigationbuttoncolor != nil) { // Set button color if user sets it in options
-      self.backButton.tintColor = [self colorFromHexString:_browserOptions.navigationbuttoncolor];
-    }
-    [self.backButton setTitleTextAttributes:toolbarAttributes forState: UIControlStateNormal];
-    [self.backButton setTitleTextAttributes:toolbarAttributes forState: UIControlStateHighlighted];
-    [self.backButton setTitleTextAttributes:toolbarAttributes forState: UIControlStateDisabled];
+
     UIBarButtonItem *browserButton = [[UIBarButtonItem alloc] initWithTitle:@"Browser" style:UIBarButtonItemStylePlain target:self action:@selector(reopenInBrowser:)];
 
-    [self.toolbar setItems:@[self.backButton, fixedSpaceButton, self.forwardButton, flexibleSpaceButton, browserButton]];
+    [self.toolbar setItems:@[self.backButton, fixedSpaceButton, self.forwardButton, flexibleSpaceButton]];
     
     [self.view addSubview:header];
     [self.view addSubview:footer];
